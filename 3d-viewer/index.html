@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WaterSafe V2 - Ultra-Realistic 3D Water Testing Simulation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0a0a12;
+            --bg-secondary: rgba(15, 15, 25, 0.9);
+            --accent-cyan: #00d4ff;
+            --accent-green: #00ff88;
+            --accent-yellow: #ffcc00;
+            --accent-red: #ff4466;
+            --accent-orange: #ff8844;
+            --text-primary: #ffffff;
+            --text-secondary: #888899;
+            --glass-bg: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.08);
+        }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            overflow: hidden;
+        }
+
+        #app {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* Loading Screen */
+        .loading-screen {
+            position: fixed;
+            inset: 0;
+            background: var(--bg-primary);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            transition: opacity 0.8s ease, visibility 0.8s;
+        }
+
+        .loading-screen.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .loading-logo {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-green));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 30px;
+        }
+
+        .loading-bar-container {
+            width: 260px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .loading-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-green));
+            border-radius: 2px;
+            transition: width 0.3s ease;
+        }
+
+        .loading-status {
+            margin-top: 20px;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        /* Main Control Panel */
+        .control-panel {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            width: 320px;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 24px;
+            z-index: 100;
+        }
+
+        .control-panel::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .control-panel::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+        }
+
+        .panel-header {
+            margin-bottom: 24px;
+        }
+
+        .panel-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-green));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .panel-subtitle {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
+            letter-spacing: 0.5px;
+        }
+
+        .section {
+            margin-bottom: 24px;
+        }
+
+        .section-title {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section-title::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--glass-border);
+        }
+
+        /* Water Quality Controls */
+        .quality-control {
+            margin-bottom: 16px;
+        }
+
+        .quality-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .quality-name {
+            font-size: 0.85rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .quality-icon {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .quality-value {
+            font-size: 0.8rem;
+            color: var(--accent-cyan);
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .slider-container {
+            position: relative;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            overflow: visible;
+        }
+
+        .slider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 6px;
+            background: transparent;
+            cursor: pointer;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent-cyan);
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            box-shadow: 0 0 15px rgba(0, 212, 255, 0.7);
+        }
+
+        .slider-fill {
+            position: absolute;
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-green));
+            border-radius: 3px;
+            pointer-events: none;
+        }
+
+        /* Zone Legend */
+        .zone-legend {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .zone-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 8px;
+            border: 1px solid transparent;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .zone-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: var(--glass-border);
+        }
+
+        .zone-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+        }
+
+        .zone-icon.safe {
+            background: rgba(0, 255, 136, 0.2);
+            color: var(--accent-green);
+        }
+
+        .zone-icon.caution {
+            background: rgba(255, 204, 0, 0.2);
+            color: var(--accent-yellow);
+        }
+
+        .zone-icon.danger {
+            background: rgba(255, 68, 102, 0.2);
+            color: var(--accent-red);
+        }
+
+        .zone-text {
+            flex: 1;
+        }
+
+        .zone-name {
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .zone-desc {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+        }
+
+        /* Toggle Buttons */
+        .toggle-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .toggle-btn {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+
+        .toggle-btn:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .toggle-btn.active {
+            background: rgba(0, 212, 255, 0.1);
+            border-color: rgba(0, 212, 255, 0.3);
+            color: var(--accent-cyan);
+        }
+
+        .toggle-indicator {
+            width: 36px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            position: relative;
+            transition: background 0.2s;
+        }
+
+        .toggle-btn.active .toggle-indicator {
+            background: rgba(0, 212, 255, 0.3);
+        }
+
+        .toggle-indicator::after {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            background: #fff;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.2s;
+        }
+
+        .toggle-btn.active .toggle-indicator::after {
+            transform: translateX(16px);
+            background: var(--accent-cyan);
+        }
+
+        /* Preset Buttons */
+        .preset-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .preset-btn {
+            padding: 12px 10px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .preset-btn:hover {
+            background: rgba(255, 255, 255, 0.05);
+            transform: translateY(-2px);
+        }
+
+        .preset-btn:active {
+            transform: translateY(0);
+        }
+
+        .preset-icon {
+            font-size: 1.5rem;
+            margin-bottom: 6px;
+        }
+
+        .preset-name {
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        /* Info Tooltip */
+        .info-tooltip {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 16px 24px;
+            max-width: 400px;
+            text-align: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+            z-index: 100;
+        }
+
+        .info-tooltip.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .info-tooltip h3 {
+            font-size: 1rem;
+            color: var(--accent-cyan);
+            margin-bottom: 6px;
+        }
+
+        .info-tooltip p {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .info-tooltip .zone-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+
+        .zone-badge.safe {
+            background: rgba(0, 255, 136, 0.2);
+            color: var(--accent-green);
+        }
+
+        .zone-badge.caution {
+            background: rgba(255, 204, 0, 0.2);
+            color: var(--accent-yellow);
+        }
+
+        .zone-badge.danger {
+            background: rgba(255, 68, 102, 0.2);
+            color: var(--accent-red);
+        }
+
+        /* Sensor Readout Panel */
+        .readout-panel {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 240px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 20px;
+            z-index: 100;
+        }
+
+        .readout-title {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+        }
+
+        .readout-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .readout-item:last-child {
+            border-bottom: none;
+        }
+
+        .readout-label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .readout-value {
+            font-size: 1rem;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .readout-value.normal {
+            color: var(--accent-green);
+        }
+
+        .readout-value.warning {
+            color: var(--accent-yellow);
+        }
+
+        .readout-value.danger {
+            color: var(--accent-red);
+        }
+
+        /* Controls Hint */
+        .controls-hint {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            padding: 12px 16px;
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            z-index: 100;
+        }
+
+        .controls-hint kbd {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 3px 8px;
+            border-radius: 4px;
+            margin: 0 3px;
+            font-family: inherit;
+        }
+
+        /* Animations */
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        @keyframes glow {
+
+            0%,
+            100% {
+                box-shadow: 0 0 5px currentColor;
+            }
+
+            50% {
+                box-shadow: 0 0 20px currentColor;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Loading Screen -->
+    <div class="loading-screen" id="loading">
+        <div class="loading-logo">WaterSafe V2</div>
+        <div class="loading-bar-container">
+            <div class="loading-bar" id="loading-bar"></div>
+        </div>
+        <div class="loading-status" id="loading-status">Initializing 3D Engine...</div>
+    </div>
+
+    <!-- Main App Container -->
+    <div id="app"></div>
+
+    <!-- Control Panel -->
+    <div class="control-panel" id="control-panel">
+        <div class="panel-header">
+            <div class="panel-title">WaterSafe V2</div>
+            <div class="panel-subtitle">Interactive Water Testing Simulation</div>
+        </div>
+
+        <!-- Water Quality Parameters -->
+        <div class="section">
+            <div class="section-title">Water Quality Parameters</div>
+
+            <div class="quality-control">
+                <div class="quality-label">
+                    <span class="quality-name">
+                        <span class="quality-icon" style="background: #7b68ee;"></span>
+                        pH Level
+                    </span>
+                    <span class="quality-value" id="ph-value">7.0</span>
+                </div>
+                <div class="slider-container">
+                    <div class="slider-fill" id="ph-fill" style="width: 50%;"></div>
+                    <input type="range" class="slider" id="ph-slider" min="0" max="14" step="0.1" value="7">
+                </div>
+            </div>
+
+            <div class="quality-control">
+                <div class="quality-label">
+                    <span class="quality-name">
+                        <span class="quality-icon" style="background: #8b4513;"></span>
+                        Turbidity (NTU)
+                    </span>
+                    <span class="quality-value" id="turbidity-value">0</span>
+                </div>
+                <div class="slider-container">
+                    <div class="slider-fill" id="turbidity-fill" style="width: 0%;"></div>
+                    <input type="range" class="slider" id="turbidity-slider" min="0" max="1000" step="1" value="0">
+                </div>
+            </div>
+
+            <div class="quality-control">
+                <div class="quality-label">
+                    <span class="quality-name">
+                        <span class="quality-icon" style="background: #20b2aa;"></span>
+                        TDS (ppm)
+                    </span>
+                    <span class="quality-value" id="tds-value">250</span>
+                </div>
+                <div class="slider-container">
+                    <div class="slider-fill" id="tds-fill" style="width: 25%;"></div>
+                    <input type="range" class="slider" id="tds-slider" min="0" max="1000" step="1" value="250">
+                </div>
+            </div>
+
+            <div class="quality-control">
+                <div class="quality-label">
+                    <span class="quality-name">
+                        <span class="quality-icon" style="background: #ff6347;"></span>
+                        Temperature (°C)
+                    </span>
+                    <span class="quality-value" id="temp-value">25.0</span>
+                </div>
+                <div class="slider-container">
+                    <div class="slider-fill" id="temp-fill" style="width: 33%;"></div>
+                    <input type="range" class="slider" id="temp-slider" min="0" max="75" step="0.5" value="25">
+                </div>
+            </div>
+        </div>
+
+        <!-- Water Presets -->
+        <div class="section">
+            <div class="section-title">Water Presets</div>
+            <div class="preset-grid">
+                <button class="preset-btn" data-preset="pure">
+                    <div class="preset-icon">💧</div>
+                    <div class="preset-name">Pure Water</div>
+                </button>
+                <button class="preset-btn" data-preset="tap">
+                    <div class="preset-icon">🚰</div>
+                    <div class="preset-name">Tap Water</div>
+                </button>
+                <button class="preset-btn" data-preset="muddy">
+                    <div class="preset-icon">🟤</div>
+                    <div class="preset-name">Muddy Water</div>
+                </button>
+                <button class="preset-btn" data-preset="acidic">
+                    <div class="preset-icon">⚗️</div>
+                    <div class="preset-name">Acidic</div>
+                </button>
+                <button class="preset-btn" data-preset="alkaline">
+                    <div class="preset-icon">🧪</div>
+                    <div class="preset-name">Alkaline</div>
+                </button>
+                <button class="preset-btn" data-preset="contaminated">
+                    <div class="preset-icon">☠️</div>
+                    <div class="preset-name">Contaminated</div>
+                </button>
+            </div>
+        </div>
+
+        <!-- Waterproof Zones -->
+        <div class="section">
+            <div class="section-title">Waterproof Zones</div>
+            <div class="zone-legend">
+                <div class="zone-item" data-zone="safe">
+                    <div class="zone-icon safe">💧</div>
+                    <div class="zone-text">
+                        <div class="zone-name">Submerge Safe</div>
+                        <div class="zone-desc">Can be fully immersed in water</div>
+                    </div>
+                </div>
+                <div class="zone-item" data-zone="caution">
+                    <div class="zone-icon caution">⚠️</div>
+                    <div class="zone-text">
+                        <div class="zone-name">Splash Zone</div>
+                        <div class="zone-desc">Resist splashes, avoid submersion</div>
+                    </div>
+                </div>
+                <div class="zone-item" data-zone="danger">
+                    <div class="zone-icon danger">🚫</div>
+                    <div class="zone-text">
+                        <div class="zone-name">Keep Dry</div>
+                        <div class="zone-desc">Electronics - no water contact</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- View Options -->
+        <div class="section">
+            <div class="section-title">View Options</div>
+            <div class="toggle-group">
+                <button class="toggle-btn active" id="toggle-wires">
+                    <span class="toggle-indicator"></span>
+                    Show Wiring
+                </button>
+                <button class="toggle-btn active" id="toggle-labels">
+                    <span class="toggle-indicator"></span>
+                    Component Labels
+                </button>
+                <button class="toggle-btn" id="toggle-xray">
+                    <span class="toggle-indicator"></span>
+                    X-Ray Mode
+                </button>
+                <button class="toggle-btn active" id="toggle-water">
+                    <span class="toggle-indicator"></span>
+                    Water Surface
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sensor Readout Panel -->
+    <div class="readout-panel" id="readout-panel">
+        <div class="readout-title">Live Sensor Readings</div>
+        <div class="readout-item">
+            <span class="readout-label">pH</span>
+            <span class="readout-value normal" id="readout-ph">7.00</span>
+        </div>
+        <div class="readout-item">
+            <span class="readout-label">Turbidity</span>
+            <span class="readout-value normal" id="readout-turbidity">0 NTU</span>
+        </div>
+        <div class="readout-item">
+            <span class="readout-label">TDS</span>
+            <span class="readout-value normal" id="readout-tds">250 ppm</span>
+        </div>
+        <div class="readout-item">
+            <span class="readout-label">Temperature</span>
+            <span class="readout-value normal" id="readout-temp">25.0°C</span>
+        </div>
+        <div class="readout-item">
+            <span class="readout-label">Status</span>
+            <span class="readout-value normal" id="readout-status">NORMAL</span>
+        </div>
+    </div>
+
+    <!-- Info Tooltip -->
+    <div class="info-tooltip" id="info-tooltip">
+        <h3 id="info-title">Component</h3>
+        <p id="info-desc">Description</p>
+        <span class="zone-badge" id="info-zone">ZONE</span>
+    </div>
+
+    <!-- Controls Hint -->
+    <div class="controls-hint">
+        <kbd>Drag</kbd> Rotate
+        <kbd>Scroll</kbd> Zoom
+        <kbd>Right-drag</kbd> Pan
+        <kbd>Click</kbd> Inspect
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+</body>
+
+</html>

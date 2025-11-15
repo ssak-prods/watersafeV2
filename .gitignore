@@ -1,0 +1,44 @@
+# WaterSafe V2 Project Ignores
+
+# Excluded by User Request (Meta-files & Internal Docs)
+AgentSystemPrompts.md
+CommunicationArea.md
+CRITICAL_SYSTEM_ANALYSIS.md
+DeploymentGuide.md
+FRONTEND_BUILDER_PROMPT.md
+HARDWARE_COMPLETE_SUMMARY.md
+HardwareAssembly_StepByStep.md
+ML_STATUS_VERIFIED.md
+ML_STRATEGY.md
+NEXT_STEPS_ROADMAP.md
+PH_REMOVAL_PLAN.md
+PH_REMOVAL_SUMMARY.md
+PROJECT_STATUS.md
+ProjectInstructions.txt
+PROJECTREPORTWatersafeV2.txt
+roadmap.md
+SESSION_CONTEXT_REMINDER.md
+BackdatingContext.md
+.conflux
+learning/
+
+# PlatformIO & Build Artifacts
+.pio/
+.venv/
+.vscode/
+node_modules/
+dist/
+*.backup*
+*.pyc
+__pycache__/
+
+# Python Data Cache
+ml/water_potability_raw.csv
+ml/scaler.save
+ml/autoencoder.pth
+ml/autoencoder.onnx
+ml/autoencoder.onnx.data
+
+# Temporary Scripts
+setup_git.ps1
+populate_datasets.py

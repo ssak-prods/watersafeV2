@@ -1,0 +1,10 @@
+pandas
+numpy
+torch
+scikit-learn
+requests
+joblib
+onnx
+onnx-tf
+tensorflow
+tflite-support

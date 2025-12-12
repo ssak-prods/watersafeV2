@@ -1,0 +1,68 @@
+graph TD
+    %% Defines
+    classDef pwr fill:#f9f,stroke:#333,stroke-width:2px;
+    classDef mcu fill:#add8e6,stroke:#333,stroke-width:2px;
+    classDef sens fill:#90ee90,stroke:#333,stroke-width:2px;
+    classDef logic fill:#ffe4b5,stroke:#333,stroke-width:2px;
+
+    %% Power Rail
+    V5[5V Source]:::pwr
+    V3[3.3V Regulator (Onboard ESP)]:::pwr
+    GND[Common Ground]:::pwr
+
+    %% Core Components
+    ESP32[ESP32-WROOM-32]:::mcu
+    ADS[ADS1115 16-bit ADC]:::logic
+    
+    %% Sensors
+    PH[pH Sensor Module]:::sens
+    TURB[Turbidity Module]:::sens
+    TDS[TDS Sensor Module]:::sens
+    TEMP[DS18B20 Temp Probe]:::sens
+
+    %% Connections - Power
+    V5 -->|VIN| ESP32
+    V5 -->|VCC| PH
+    V5 -->|VCC| TURB
+    V5 -->|VCC| TDS
+    V5 -->|VDD| TEMP
+    ESP32 -->|3V3 Out| ADS
+    
+    %% Grounding
+    GND --- ESP32
+    GND --- ADS
+    GND --- PH
+    GND --- TURB
+    GND --- TDS
+    GND --- TEMP
+
+    %% I2C Bus (ESP32 <-> ADS1115)
+    ESP32 -->|GPIO 22 / SCL| ADS
+    ESP32 -->|GPIO 21 / SDA| ADS
+    %% ADS Configuration
+    ADS -->|ADDR -> GND| GND
+    %% This sets address to 0x48
+
+    %% OneWire (ESP32 <-> DS18B20)
+    TEMP -->|Data| GPIO4[ESP32 GPIO 4]
+    V5 -.->|4.7k Pullup| GPIO4
+
+    %% Analog Signals (Sensors -> Voltage Dividers -> ADS1115)
+    %% Divider logic: 5V Signal -> [10k] -> ADC -> [20k] -> GND
+    
+    subgraph Voltage_Dividers [Signal Conditioning]
+        DIV_PH[Div: 10k/20k]
+        DIV_TURB[Div: 10k/20k]
+        DIV_TDS[Div: 10k/20k]
+    end
+
+    PH -->|Analog Out| DIV_PH
+    TURB -->|Analog Out| DIV_TURB
+    TDS -->|Analog Out| DIV_TDS
+
+    DIV_PH -->|Scaled Signal| A0[ADS1115 A0]
+    DIV_TURB -->|Scaled Signal| A1[ADS1115 A1]
+    DIV_TDS -->|Scaled Signal| A2[ADS1115 A2]
+
+    %% Notes
+    class ESP32,ADS,PH,TURB,TDS,TEMP internal-link;

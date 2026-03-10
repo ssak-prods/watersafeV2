@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "conflux-team-memory": {
+      "command": "python",
+      "args": [
+        "c:\\Users\\Suhaib Ahmed\\.windsurf\\extensions\\confluxai.conflux-ai-0.1.7\\mcp-server\\server.py",
+        "--conflux-dir",
+        "d:\\watersafeV2\\.conflux"
+      ]
+    }
+  }
+}

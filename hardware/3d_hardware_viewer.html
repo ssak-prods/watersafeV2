@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WaterSafe V2 - Interactive 3D Hardware Model</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #0a0a1a 0%, #1a1a2e 50%, #0f0f23 100%);
+            overflow: hidden;
+            color: #e0e0e0;
+        }
+
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* Glass-morphism UI Panel */
+        .ui-panel {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 24px;
+            min-width: 280px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            z-index: 100;
+        }
+
+        .ui-panel h1 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+            background: linear-gradient(135deg, #00d4ff, #7b2cbf);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .ui-panel .subtitle {
+            font-size: 0.75rem;
+            color: #888;
+            margin-bottom: 20px;
+            letter-spacing: 0.5px;
+        }
+
+        .section-title {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: #666;
+            margin: 16px 0 10px 0;
+        }
+
+        .toggle-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .toggle-btn {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.85rem;
+            color: #ccc;
+        }
+
+        .toggle-btn:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .toggle-btn.active {
+            background: rgba(0, 212, 255, 0.1);
+            border-color: rgba(0, 212, 255, 0.3);
+            color: #00d4ff;
+        }
+
+        .toggle-btn .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .dot-power { background: #ff4444; }
+        .dot-i2c { background: #44ff44; }
+        .dot-onewire { background: #4488ff; }
+        .dot-analog { background: #ffaa44; }
+
+        /* Info tooltip */
+        .info-panel {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 16px 24px;
+            max-width: 500px;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .info-panel.visible {
+            opacity: 1;
+        }
+
+        .info-panel h3 {
+            font-size: 1rem;
+            color: #00d4ff;
+            margin-bottom: 6px;
+        }
+
+        .info-panel p {
+            font-size: 0.85rem;
+            color: #aaa;
+            line-height: 1.5;
+        }
+
+        /* Controls hint */
+        .controls-hint {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 12px 16px;
+            font-size: 0.7rem;
+            color: #666;
+            z-index: 100;
+        }
+
+        .controls-hint kbd {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin: 0 2px;
+        }
+
+        /* Loading screen */
+        .loading-screen {
+            position: fixed;
+            inset: 0;
+            background: #0a0a1a;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            transition: opacity 0.5s ease;
+        }
+
+        .loading-screen.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(0, 212, 255, 0.1);
+            border-top-color: #00d4ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .loading-text {
+            margin-top: 20px;
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="loading-screen" id="loading">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Loading 3D Model...</div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <!-- UI Panel -->
+    <div class="ui-panel">
+        <h1>WaterSafe V2</h1>
+        <div class="subtitle">Interactive Hardware Model</div>
+        
+        <div class="section-title">Wire Visibility</div>
+        <div class="toggle-group">
+            <button class="toggle-btn active" data-wire="power">
+                <span class="dot dot-power"></span>
+                Power Rails (5V/GND)
+            </button>
+            <button class="toggle-btn active" data-wire="i2c">
+                <span class="dot dot-i2c"></span>
+                I2C Bus (SDA/SCL)
+            </button>
+            <button class="toggle-btn active" data-wire="onewire">
+                <span class="dot dot-onewire"></span>
+                OneWire (DS18B20)
+            </button>
+            <button class="toggle-btn active" data-wire="analog">
+                <span class="dot dot-analog"></span>
+                Analog Signals
+            </button>
+        </div>
+
+        <div class="section-title">Components</div>
+        <div class="toggle-group" id="component-list">
+            <!-- Populated by JS -->
+        </div>
+    </div>
+
+    <!-- Info Panel -->
+    <div class="info-panel" id="info-panel">
+        <h3 id="info-title">Component Name</h3>
+        <p id="info-desc">Component description</p>
+    </div>
+
+    <!-- Controls Hint -->
+    <div class="controls-hint">
+        <kbd>Drag</kbd> Rotate &nbsp;|&nbsp; <kbd>Scroll</kbd> Zoom &nbsp;|&nbsp; <kbd>Right-drag</kbd> Pan &nbsp;|&nbsp; <kbd>Click</kbd> Select
+    </div>
+
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        // ============================================
+        // WaterSafe V2 - Interactive 3D Hardware Model
+        // ============================================
+
+        // Component information database
+        const componentInfo = {
+            'esp32': {
+                name: 'ESP32-WROOM-32 DevKit',
+                desc: '30-pin development board with WiFi/Bluetooth. Runs the main firmware, reads sensors via I2C (GPIO 21/22) and OneWire (GPIO 4).'
+            },
+            'breadboard': {
+                name: 'MB-102 Breadboard',
+                desc: '830 tie-point solderless breadboard. Red rail = 5V power, Blue rail = Ground. Components plug in for prototyping.'
+            },
+            'ads1115': {
+                name: 'ADS1115 16-bit ADC',
+                desc: 'High-precision analog-to-digital converter. Reads pH (A0), Turbidity (A1), and TDS (A2) sensors via I2C at address 0x48.'
+            },
+            'oled': {
+                name: 'SSD1306 OLED Display',
+                desc: '0.96" 128x64 pixel OLED display. Shows real-time sensor readings and system status via I2C.'
+            },
+            'ph_sensor': {
+                name: 'pH Sensor Module',
+                desc: 'Analog pH meter with BNC connector. Measures water acidity (0-14 pH). Output connected to ADS1115 channel A0.'
+            },
+            'turbidity_sensor': {
+                name: 'Turbidity Sensor',
+                desc: 'Optical sensor measuring water clarity. Uses infrared light scattering. Connected to ADS1115 channel A1.'
+            },
+            'tds_sensor': {
+                name: 'TDS Sensor (Gravity)',
+                desc: 'Measures Total Dissolved Solids in ppm. Temperature-compensated readings. Connected to ADS1115 channel A2.'
+            },
+            'ds18b20': {
+                name: 'DS18B20 Temperature Probe',
+                desc: 'Waterproof digital temperature sensor. Uses OneWire protocol on GPIO 4 with 4.7kΩ pull-up resistor.'
+            },
+            'resistor_pullup': {
+                name: '4.7kΩ Pull-up Resistor',
+                desc: 'Required for OneWire bus. Connects between 5V and DS18B20 data line to ensure reliable communication.'
+            }
+        };
+
+        // Global variables
+        let scene, camera, renderer, controls;
+        let components = {};
+        let wires = { power: [], i2c: [], onewire: [], analog: [] };
+        let raycaster, mouse;
+        let selectedObject = null;
+
+        // Initialize
+        init();
+        animate();
+
+        function init() {
+            // Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0a0a1a);
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(15, 12, 15);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.outputEncoding = THREE.sRGBEncoding;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.2;
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            // Controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.minDistance = 5;
+            controls.maxDistance = 50;
+            controls.target.set(0, 2, 0);
+
+            // Lighting
+            setupLighting();
+
+            // Create scene
+            createFloor();
+            createBreadboard();
+            createESP32();
+            createADS1115();
+            createOLED();
+            createSensors();
+            createWires();
+
+            // Raycaster for interaction
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+
+            // Events
+            window.addEventListener('resize', onWindowResize);
+            renderer.domElement.addEventListener('click', onMouseClick);
+            renderer.domElement.addEventListener('mousemove', onMouseMove);
+
+            // Wire toggle buttons
+            document.querySelectorAll('.toggle-btn[data-wire]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    btn.classList.toggle('active');
+                    const wireType = btn.dataset.wire;
+                    const visible = btn.classList.contains('active');
+                    wires[wireType].forEach(wire => wire.visible = visible);
+                });
+            });
+
+            // Hide loading screen
+            setTimeout(() => {
+                document.getElementById('loading').classList.add('hidden');
+            }, 1000);
+        }
+
+        function setupLighting() {
+            // Ambient light
+            const ambient = new THREE.AmbientLight(0x404060, 0.5);
+            scene.add(ambient);
+
+            // Main directional light (sun)
+            const mainLight = new THREE.DirectionalLight(0xffffff, 1.2);
+            mainLight.position.set(10, 20, 10);
+            mainLight.castShadow = true;
+            mainLight.shadow.mapSize.width = 2048;
+            mainLight.shadow.mapSize.height = 2048;
+            mainLight.shadow.camera.near = 0.5;
+            mainLight.shadow.camera.far = 50;
+            mainLight.shadow.camera.left = -15;
+            mainLight.shadow.camera.right = 15;
+            mainLight.shadow.camera.top = 15;
+            mainLight.shadow.camera.bottom = -15;
+            mainLight.shadow.bias = -0.0001;
+            scene.add(mainLight);
+
+            // Fill light
+            const fillLight = new THREE.DirectionalLight(0x4488ff, 0.3);
+            fillLight.position.set(-10, 10, -10);
+            scene.add(fillLight);
+
+            // Rim light
+            const rimLight = new THREE.DirectionalLight(0xff8844, 0.2);
+            rimLight.position.set(0, 5, -15);
+            scene.add(rimLight);
+
+            // Point lights for local highlights
+            const pointLight1 = new THREE.PointLight(0x00d4ff, 0.5, 20);
+            pointLight1.position.set(-5, 8, 5);
+            scene.add(pointLight1);
+        }
+
+        function createFloor() {
+            // Grid helper
+            const gridHelper = new THREE.GridHelper(30, 30, 0x222244, 0x111122);
+            scene.add(gridHelper);
+
+            // Floor plane
+            const floorGeo = new THREE.PlaneGeometry(40, 40);
+            const floorMat = new THREE.MeshStandardMaterial({
+                color: 0x0a0a15,
+                roughness: 0.9,
+                metalness: 0.1
+            });
+            const floor = new THREE.Mesh(floorGeo, floorMat);
+            floor.rotation.x = -Math.PI / 2;
+            floor.position.y = -0.01;
+            floor.receiveShadow = true;
+            scene.add(floor);
+        }
+
+        // ============================================
+        // COMPONENT CREATION - PHOTOREALISTIC MODELS
+        // ============================================
+
+        function createBreadboard() {
+            const group = new THREE.Group();
+            group.userData.id = 'breadboard';
+
+            // Main body - cream/white ABS
+            const bodyGeo = new THREE.BoxGeometry(16.5, 0.85, 5.5);
+            const bodyMat = new THREE.MeshStandardMaterial({
+                color: 0xf5f5f0,
+                roughness: 0.6,
+                metalness: 0.05
+            });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.castShadow = true;
+            body.receiveShadow = true;
+            group.add(body);
+
+            // Power rails - red stripe
+            const redRailGeo = new THREE.BoxGeometry(16.3, 0.02, 0.3);
+            const redRailMat = new THREE.MeshStandardMaterial({ color: 0xff3333, roughness: 0.4 });
+            const redRail = new THREE.Mesh(redRailGeo, redRailMat);
+            redRail.position.set(0, 0.44, 2.4);
+            group.add(redRail);
+
+            // Power rails - blue stripe
+            const blueRailGeo = new THREE.BoxGeometry(16.3, 0.02, 0.3);
+            const blueRailMat = new THREE.MeshStandardMaterial({ color: 0x3366ff, roughness: 0.4 });
+            const blueRail = new THREE.Mesh(blueRailGeo, blueRailMat);
+            blueRail.position.set(0, 0.44, 2.0);
+            group.add(blueRail);
+
+            // Second power rail set
+            const redRail2 = redRail.clone();
+            redRail2.position.z = -2.0;
+            group.add(redRail2);
+
+            const blueRail2 = blueRail.clone();
+            blueRail2.position.z = -2.4;
+            group.add(blueRail2);
+
+            // Tie point holes (simplified as texture pattern)
+            const holesGeo = new THREE.PlaneGeometry(15, 3.5);
+            const holesMat = new THREE.MeshStandardMaterial({
+                color: 0xe8e8e0,
+                roughness: 0.8,
+                metalness: 0.1
+            });
+            const holes = new THREE.Mesh(holesGeo, holesMat);
+            holes.rotation.x = -Math.PI / 2;
+            holes.position.y = 0.431;
+            group.add(holes);
+
+            // Create actual hole pattern
+            const holeMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9 });
+            for (let x = -7; x <= 7; x += 0.254) {
+                for (let z = -1.5; z <= 1.5; z += 0.254) {
+                    if (Math.abs(z) < 0.2) continue; // Center gap
+                    const holeGeo = new THREE.CircleGeometry(0.05, 8);
+                    const hole = new THREE.Mesh(holeGeo, holeMat);
+                    hole.rotation.x = -Math.PI / 2;
+                    hole.position.set(x, 0.432, z);
+                    group.add(hole);
+                }
+            }
+
+            group.position.set(0, 0.5, 0);
+            scene.add(group);
+            components['breadboard'] = group;
+        }
+
+        function createESP32() {
+            const group = new THREE.Group();
+            group.userData.id = 'esp32';
+
+            // PCB - Blue with realistic texture
+            const pcbGeo = new THREE.BoxGeometry(2.8, 0.16, 5.5);
+            const pcbMat = new THREE.MeshStandardMaterial({
+                color: 0x1a4a8a,
+                roughness: 0.4,
+                metalness: 0.3
+            });
+            const pcb = new THREE.Mesh(pcbGeo, pcbMat);
+            pcb.castShadow = true;
+            group.add(pcb);
+
+            // ESP32-WROOM-32 chip (black metal shield)
+            const chipGeo = new THREE.BoxGeometry(1.8, 0.3, 2.5);
+            const chipMat = new THREE.MeshStandardMaterial({
+                color: 0x1a1a1a,
+                roughness: 0.2,
+                metalness: 0.8
+            });
+            const chip = new THREE.Mesh(chipGeo, chipMat);
+            chip.position.set(0, 0.23, -0.5);
+            chip.castShadow = true;
+            group.add(chip);
+
+            // Chip label emboss
+            const labelGeo = new THREE.PlaneGeometry(1.4, 0.8);
+            const labelMat = new THREE.MeshStandardMaterial({
+                color: 0x333333,
+                roughness: 0.3,
+                metalness: 0.5
+            });
+            const label = new THREE.Mesh(labelGeo, labelMat);
+            label.rotation.x = -Math.PI / 2;
+            label.position.set(0, 0.39, -0.5);
+            group.add(label);
+
+            // Micro USB port (silver)
+            const usbGeo = new THREE.BoxGeometry(0.8, 0.3, 0.5);
+            const usbMat = new THREE.MeshStandardMaterial({
+                color: 0xcccccc,
+                roughness: 0.2,
+                metalness: 0.9
+            });
+            const usb = new THREE.Mesh(usbGeo, usbMat);
+            usb.position.set(0, 0.1, 2.7);
+            usb.castShadow = true;
+            group.add(usb);
+
+            // USB port opening
+            const usbOpenGeo = new THREE.BoxGeometry(0.5, 0.15, 0.2);
+            const usbOpenMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+            const usbOpen = new THREE.Mesh(usbOpenGeo, usbOpenMat);
+            usbOpen.position.set(0, 0.1, 2.85);
+            group.add(usbOpen);
+
+            // Pin headers (gold plated) - two rows of 15 pins
+            const pinMat = new THREE.MeshStandardMaterial({
+                color: 0xd4af37,
+                roughness: 0.3,
+                metalness: 0.9
+            });
+
+            for (let i = 0; i < 15; i++) {
+                const z = -2.5 + i * 0.354;
+                
+                // Left row
+                const pin1Geo = new THREE.CylinderGeometry(0.04, 0.04, 0.8, 8);
+                const pin1 = new THREE.Mesh(pin1Geo, pinMat);
+                pin1.position.set(-1.2, -0.4, z);
+                group.add(pin1);
+
+                // Right row
+                const pin2 = pin1.clone();
+                pin2.position.set(1.2, -0.4, z);
+                group.add(pin2);
+
+                // Pin plastic base (black)
+                const baseMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
+                const baseGeo = new THREE.BoxGeometry(0.25, 0.25, 0.25);
+                const base1 = new THREE.Mesh(baseGeo, baseMat);
+                base1.position.set(-1.2, 0.0, z);
+                group.add(base1);
+
+                const base2 = base1.clone();
+                base2.position.set(1.2, 0.0, z);
+                group.add(base2);
+            }
+
+            // Power LED (red)
+            const ledGeo = new THREE.SphereGeometry(0.08, 16, 16);
+            const ledMat = new THREE.MeshStandardMaterial({
+                color: 0xff0000,
+                emissive: 0xff0000,
+                emissiveIntensity: 0.8,
+                roughness: 0.2
+            });
+            const led = new THREE.Mesh(ledGeo, ledMat);
+            led.position.set(0.8, 0.12, 2.0);
+            group.add(led);
+
+            // Buttons
+            const btnGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.1, 16);
+            const btnMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.5 });
+            const btn1 = new THREE.Mesh(btnGeo, btnMat);
+            btn1.position.set(-0.8, 0.13, 1.8);
+            group.add(btn1);
+
+            const btn2 = btn1.clone();
+            btn2.position.set(0.3, 0.13, 1.8);
+            group.add(btn2);
+
+            group.position.set(-4, 1.08, 0);
+            scene.add(group);
+            components['esp32'] = group;
+        }
+
+        function createADS1115() {
+            const group = new THREE.Group();
+            group.userData.id = 'ads1115';
+
+            // PCB - Purple
+            const pcbGeo = new THREE.BoxGeometry(1.8, 0.12, 2.2);
+            const pcbMat = new THREE.MeshStandardMaterial({
+                color: 0x6b2d8a,
+                roughness: 0.4,
+                metalness: 0.3
+            });
+            const pcb = new THREE.Mesh(pcbGeo, pcbMat);
+            pcb.castShadow = true;
+            group.add(pcb);
+
+            // ADS1115 IC chip
+            const chipGeo = new THREE.BoxGeometry(0.5, 0.15, 0.5);
+            const chipMat = new THREE.MeshStandardMaterial({
+                color: 0x111111,
+                roughness: 0.4,
+                metalness: 0.2
+            });
+            const chip = new THREE.Mesh(chipGeo, chipMat);
+            chip.position.set(0, 0.135, 0);
+            group.add(chip);
+
+            // Screw terminals (gold/green)
+            const terminalMat = new THREE.MeshStandardMaterial({
+                color: 0x00aa44,
+                roughness: 0.5
+            });
+            const termGeo = new THREE.BoxGeometry(0.3, 0.4, 1.8);
+            const terminal = new THREE.Mesh(termGeo, terminalMat);
+            terminal.position.set(0.65, 0.26, 0);
+            group.add(terminal);
+
+            // Terminal screws
+            const screwMat = new THREE.MeshStandardMaterial({
+                color: 0xcccccc,
+                roughness: 0.3,
+                metalness: 0.8
+            });
+            for (let i = 0; i < 4; i++) {
+                const screwGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.1, 8);
+                const screw = new THREE.Mesh(screwGeo, screwMat);
+                screw.rotation.z = Math.PI / 2;
+                screw.position.set(0.75, 0.35, -0.6 + i * 0.4);
+                group.add(screw);
+            }
+
+            // Pin header
+            const pinMat = new THREE.MeshStandardMaterial({
+                color: 0xd4af37,
+                roughness: 0.3,
+                metalness: 0.9
+            });
+            for (let i = 0; i < 6; i++) {
+                const pinGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.6, 8);
+                const pin = new THREE.Mesh(pinGeo, pinMat);
+                pin.position.set(-0.7, -0.3, -0.5 + i * 0.2);
+                group.add(pin);
+            }
+
+            group.position.set(2, 1.0, 0.5);
+            scene.add(group);
+            components['ads1115'] = group;
+        }
+
+        function createOLED() {
+            const group = new THREE.Group();
+            group.userData.id = 'oled';
+
+            // PCB
+            const pcbGeo = new THREE.BoxGeometry(2.7, 0.12, 1.4);
+            const pcbMat = new THREE.MeshStandardMaterial({
+                color: 0x1a3355,
+                roughness: 0.4,
+                metalness: 0.3
+            });
+            const pcb = new THREE.Mesh(pcbGeo, pcbMat);
+            pcb.castShadow = true;
+            group.add(pcb);
+
+            // Display bezel (black)
+            const bezelGeo = new THREE.BoxGeometry(2.5, 0.15, 1.2);
+            const bezelMat = new THREE.MeshStandardMaterial({
+                color: 0x0a0a0a,
+                roughness: 0.3,
+                metalness: 0.1
+            });
+            const bezel = new THREE.Mesh(bezelGeo, bezelMat);
+            bezel.position.y = 0.135;
+            group.add(bezel);
+
+            // Active display area (blue tint glass)
+            const screenGeo = new THREE.BoxGeometry(2.2, 0.02, 0.9);
+            const screenMat = new THREE.MeshStandardMaterial({
+                color: 0x0066aa,
+                emissive: 0x003366,
+                emissiveIntensity: 0.5,
+                roughness: 0.1,
+                metalness: 0.2,
+                transparent: true,
+                opacity: 0.9
+            });
+            const screen = new THREE.Mesh(screenGeo, screenMat);
+            screen.position.y = 0.22;
+            group.add(screen);
+
+            // Pin header (4 pins)
+            const pinMat = new THREE.MeshStandardMaterial({
+                color: 0xd4af37,
+                roughness: 0.3,
+                metalness: 0.9
+            });
+            for (let i = 0; i < 4; i++) {
+                const pinGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.5, 8);
+                const pin = new THREE.Mesh(pinGeo, pinMat);
+                pin.position.set(-0.9 + i * 0.25, -0.25, -0.55);
+                group.add(pin);
+            }
+
+            group.position.set(2, 1.0, -1.5);
+            scene.add(group);
+            components['oled'] = group;
+        }
+
+        function createSensors() {
+            // pH Sensor
+            createPHSensor();
+            // Turbidity Sensor
+            createTurbiditySensor();
+            // TDS Sensor
+            createTDSSensor();
+            // DS18B20 Temperature Probe
+            createDS18B20();
+            // Pull-up Resistor
+            createResistor();
+        }
+
+        function createPHSensor() {
+            const group = new THREE.Group();
+            group.userData.id = 'ph_sensor';
+
+            // PCB Module (yellow)
+            const pcbGeo = new THREE.BoxGeometry(4.2, 0.2, 2.8);
+            const pcbMat = new THREE.MeshStandardMaterial({
+                color: 0xccaa00,
+                roughness: 0.4,
+                metalness: 0.2
+            });
+            const pcb = new THREE.Mesh(pcbGeo, pcbMat);
+            pcb.castShadow = true;
+            group.add(pcb);
+
+            // BNC Connector (silver cylinder)
+            const bncGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.8, 16);
+            const bncMat = new THREE.MeshStandardMaterial({
+                color: 0xcccccc,
+                roughness: 0.2,
+                metalness: 0.9
+            });
+            const bnc = new THREE.Mesh(bncGeo, bncMat);
+            bnc.rotation.x = Math.PI / 2;
+            bnc.position.set(1.5, 0.3, 1.2);
+            bnc.castShadow = true;
+            group.add(bnc);
+
+            // BNC center pin
+            const centerPinGeo = new THREE.CylinderGeometry(0.08, 0.08, 1.0, 8);
+            const goldMat = new THREE.MeshStandardMaterial({
+                color: 0xd4af37,
+                roughness: 0.3,
+                metalness: 0.9
+            });
+            const centerPin = new THREE.Mesh(centerPinGeo, goldMat);
+            centerPin.rotation.x = Math.PI / 2;
+            centerPin.position.set(1.5, 0.3, 1.5);
+            group.add(centerPin);
+
+            // Potentiometer
+            const potGeo = new THREE.CylinderGeometry(0.25, 0.25, 0.15, 16);
+            const potMat = new THREE.MeshStandardMaterial({
+                color: 0x3366aa,
+                roughness: 0.4
+            });
+            const pot = new THREE.Mesh(potGeo, potMat);
+            pot.position.set(-1.2, 0.2, 0);
+            group.add(pot);
+
+            // Terminal block (green)
+            const termGeo = new THREE.BoxGeometry(1.2, 0.4, 0.6);
+            const termMat = new THREE.MeshStandardMaterial({
+                color: 0x00aa44,
+                roughness: 0.5
+            });
+            const term = new THREE.Mesh(termGeo, termMat);
+            term.position.set(-1.0, 0.3, -1.0);
+            group.add(term);
+
+            group.position.set(6, 1.0, 2);
+            scene.add(group);
+            components['ph_sensor'] = group;
+        }
+
+        function createTurbiditySensor() {
+            const group = new THREE.Group();
+            group.userData.id = 'turbidity_sensor';
+
+            // Main housing (black plastic)
+            const housingGeo = new THREE.BoxGeometry(3.0, 1.2, 2.5);
+            const housingMat = new THREE.MeshStandardMaterial({
+                color: 0x1a1a1a,
+                roughness: 0.6,
+                metalness: 0.1
+            });
+            const housing = new THREE.Mesh(housingGeo, housingMat);
+            housing.castShadow = true;
+            group.add(housing);
+
+            // Optical window (transparent)
+            const windowGeo = new THREE.CylinderGeometry(0.6, 0.6, 0.1, 16);
+            const windowMat = new THREE.MeshStandardMaterial({
+                color: 0xaaccff,
+                roughness: 0.1,
+                metalness: 0.05,
+                transparent: true,
+                opacity: 0.7
+            });
+            const optWindow = new THREE.Mesh(windowGeo, windowMat);
+            optWindow.rotation.x = Math.PI / 2;
+            optWindow.position.set(0, 0, 1.3);
+            group.add(optWindow);
+
+            // LED indicator (green)
+            const ledGeo = new THREE.SphereGeometry(0.1, 16, 16);
+            const ledMat = new THREE.MeshStandardMaterial({
+                color: 0x00ff00,
+                emissive: 0x00ff00,
+                emissiveIntensity: 0.6,
+                roughness: 0.2
+            });
+            const led = new THREE.Mesh(ledGeo, ledMat);
+            led.position.set(1.2, 0.5, 0);
+            group.add(led);
+
+            // Cable exit
+            const cableGeo = new THREE.CylinderGeometry(0.2, 0.2, 1.0, 8);
+            const cableMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.8 });
+            const cable = new THREE.Mesh(cableGeo, cableMat);
+            cable.rotation.z = Math.PI / 2;
+            cable.position.set(-2.0, 0, 0);
+            group.add(cable);
+
+            group.position.set(6, 1.5, -1);
+            scene.add(group);
+            components['turbidity_sensor'] = group;
+        }
+
+        function createTDSSensor() {
+            const group = new THREE.Group();
+            group.userData.id = 'tds_sensor';
+
+            // PCB Module (blue)
+            const pcbGeo = new THREE.BoxGeometry(2.5, 0.15, 1.8);
+            const pcbMat = new THREE.MeshStandardMaterial({
+                color: 0x2266aa,
+                roughness: 0.4,
+                metalness: 0.3
+            });
+            const pcb = new THREE.Mesh(pcbGeo, pcbMat);
+            pcb.castShadow = true;
+            group.add(pcb);
+
+            // Probe connector
+            const connGeo = new THREE.BoxGeometry(0.8, 0.3, 0.5);
+            const connMat = new THREE.MeshStandardMaterial({
+                color: 0xeeeeee,
+                roughness: 0.3
+            });
+            const conn = new THREE.Mesh(connGeo, connMat);
+            conn.position.set(0.7, 0.2, 0);
+            group.add(conn);
+
+            // Probe cable
+            const probeCableGeo = new THREE.CylinderGeometry(0.12, 0.12, 3, 8);
+            const probeCableMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.8 });
+            const probeCable = new THREE.Mesh(probeCableGeo, probeCableMat);
+            probeCable.rotation.z = Math.PI / 2;
+            probeCable.position.set(2.7, 0.2, 0);
+            group.add(probeCable);
+
+            // Probe tip (stainless steel prongs)
+            const prongMat = new THREE.MeshStandardMaterial({
+                color: 0xcccccc,
+                roughness: 0.2,
+                metalness: 0.9
+            });
+            const prong1Geo = new THREE.CylinderGeometry(0.05, 0.05, 1.5, 8);
+            const prong1 = new THREE.Mesh(prong1Geo, prongMat);
+            prong1.position.set(4.5, 0.2, 0.15);
+            group.add(prong1);
+
+            const prong2 = prong1.clone();
+            prong2.position.z = -0.15;
+            group.add(prong2);
+
+            group.position.set(6, 1.0, -3.5);
+            scene.add(group);
+            components['tds_sensor'] = group;
+        }
+
+        function createDS18B20() {
+            const group = new THREE.Group();
+            group.userData.id = 'ds18b20';
+
+            // Stainless steel probe body
+            const probeGeo = new THREE.CylinderGeometry(0.3, 0.3, 5, 16);
+            const probeMat = new THREE.MeshStandardMaterial({
+                color: 0xaaaaaa,
+                roughness: 0.3,
+                metalness: 0.85
+            });
+            const probe = new THREE.Mesh(probeGeo, probeMat);
+            probe.rotation.z = Math.PI / 2;
+            probe.castShadow = true;
+            group.add(probe);
+
+            // Rounded tip
+            const tipGeo = new THREE.SphereGeometry(0.3, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+            const tip = new THREE.Mesh(tipGeo, probeMat);
+            tip.rotation.z = -Math.PI / 2;
+            tip.position.set(2.5, 0, 0);
+            group.add(tip);
+
+            // Heat shrink at cable junction
+            const shrinkGeo = new THREE.CylinderGeometry(0.35, 0.3, 0.8, 16);
+            const shrinkMat = new THREE.MeshStandardMaterial({
+                color: 0x111111,
+                roughness: 0.8
+            });
+            const shrink = new THREE.Mesh(shrinkGeo, shrinkMat);
+            shrink.rotation.z = Math.PI / 2;
+            shrink.position.set(-2.8, 0, 0);
+            group.add(shrink);
+
+            // Cable (3 wires visible)
+            const cableGeo = new THREE.CylinderGeometry(0.25, 0.25, 4, 8);
+            const cableMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.9 });
+            const cable = new THREE.Mesh(cableGeo, cableMat);
+            cable.rotation.z = Math.PI / 2;
+            cable.position.set(-5, 0, 0);
+            group.add(cable);
+
+            group.position.set(-6, 2, -2);
+            group.rotation.y = Math.PI / 4;
+            scene.add(group);
+            components['ds18b20'] = group;
+        }
+
+        function createResistor() {
+            const group = new THREE.Group();
+            group.userData.id = 'resistor_pullup';
+
+            // Resistor body (ceramic)
+            const bodyGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.8, 16);
+            const bodyMat = new THREE.MeshStandardMaterial({
+                color: 0xd4b896,
+                roughness: 0.7
+            });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.rotation.z = Math.PI / 2;
+            body.castShadow = true;
+            group.add(body);
+
+            // Color bands (Yellow-Violet-Red-Gold = 4.7kΩ 5%)
+            const bandColors = [0xffff00, 0x8800ff, 0xff0000, 0xd4af37];
+            const bandPositions = [-0.25, -0.1, 0.05, 0.3];
+
+            bandColors.forEach((color, i) => {
+                const bandGeo = new THREE.CylinderGeometry(0.16, 0.16, 0.06, 16);
+                const bandMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.4 });
+                const band = new THREE.Mesh(bandGeo, bandMat);
+                band.rotation.z = Math.PI / 2;
+                band.position.set(bandPositions[i], 0, 0);
+                group.add(band);
+            });
+
+            // Wire leads
+            const leadGeo = new THREE.CylinderGeometry(0.02, 0.02, 1.0, 8);
+            const leadMat = new THREE.MeshStandardMaterial({
+                color: 0xcccccc,
+                roughness: 0.3,
+                metalness: 0.8
+            });
+            const lead1 = new THREE.Mesh(leadGeo, leadMat);
+            lead1.rotation.z = Math.PI / 2;
+            lead1.position.set(-0.9, 0, 0);
+            group.add(lead1);
+
+            const lead2 = lead1.clone();
+            lead2.position.set(0.9, 0, 0);
+            group.add(lead2);
+
+            group.position.set(-4, 1.3, -2);
+            scene.add(group);
+            components['resistor_pullup'] = group;
+        }
+
+        // ============================================
+        // WIRING
+        // ============================================
+
+        function createWires() {
+            const wireMaterials = {
+                red: new THREE.MeshStandardMaterial({ color: 0xff3333, roughness: 0.6 }),
+                black: new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.6 }),
+                yellow: new THREE.MeshStandardMaterial({ color: 0xffcc00, roughness: 0.6 }),
+                green: new THREE.MeshStandardMaterial({ color: 0x33cc33, roughness: 0.6 }),
+                blue: new THREE.MeshStandardMaterial({ color: 0x3366ff, roughness: 0.6 }),
+                orange: new THREE.MeshStandardMaterial({ color: 0xff8800, roughness: 0.6 })
+            };
+
+            // Power wires (ESP32 VIN to rail, GND to rail)
+            wires.power.push(createWire([-4, 1.2, 2.5], [-4, 1.2, 2.5], [0, 1.0, 2.4], wireMaterials.red));
+            wires.power.push(createWire([-4, 1.2, -2.5], [-4, 1.2, -2.5], [0, 1.0, -2.4], wireMaterials.black));
+
+            // I2C wires (ESP32 GPIO 21/22 to ADS1115 and OLED)
+            wires.i2c.push(createWire([-3, 1.2, 0.5], [0, 1.5, 0.5], [2, 1.2, 0.5], wireMaterials.green)); // SDA
+            wires.i2c.push(createWire([-3, 1.2, 0.8], [0, 1.6, 0.8], [2, 1.2, 0.3], wireMaterials.yellow)); // SCL
+
+            // I2C to OLED
+            wires.i2c.push(createWire([2, 1.2, 0.5], [2, 1.4, -0.5], [2, 1.2, -1.5], wireMaterials.green));
+            wires.i2c.push(createWire([2, 1.2, 0.3], [2, 1.5, -0.5], [2, 1.2, -1.3], wireMaterials.yellow));
+
+            // OneWire (ESP32 GPIO 4 to DS18B20)
+            wires.onewire.push(createWire([-4, 1.2, -1.5], [-5, 1.8, -1.8], [-6, 2.0, -2.0], wireMaterials.blue));
+
+            // Analog signals (Sensors to ADS1115)
+            wires.analog.push(createWire([6, 1.2, 2], [4, 1.5, 1.5], [2.5, 1.2, 0.8], wireMaterials.orange)); // pH
+            wires.analog.push(createWire([5, 1.5, -1], [4, 1.5, 0], [2.5, 1.2, 0.5], wireMaterials.orange)); // Turbidity
+            wires.analog.push(createWire([5, 1.2, -3.5], [4, 1.4, -1.5], [2.5, 1.2, 0.2], wireMaterials.orange)); // TDS
+        }
+
+        function createWire(start, mid, end, material) {
+            const curve = new THREE.QuadraticBezierCurve3(
+                new THREE.Vector3(...start),
+                new THREE.Vector3(...mid),
+                new THREE.Vector3(...end)
+            );
+
+            const tubeGeo = new THREE.TubeGeometry(curve, 20, 0.05, 8, false);
+            const wire = new THREE.Mesh(tubeGeo, material);
+            wire.castShadow = true;
+            scene.add(wire);
+            return wire;
+        }
+
+        // ============================================
+        // INTERACTION
+        // ============================================
+
+        function onMouseClick(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(Object.values(components).flatMap(g => g.children), true);
+
+            if (intersects.length > 0) {
+                let obj = intersects[0].object;
+                while (obj.parent && !obj.userData.id) {
+                    obj = obj.parent;
+                }
+                if (obj.userData.id && componentInfo[obj.userData.id]) {
+                    showInfo(obj.userData.id);
+                }
+            }
+        }
+
+        function onMouseMove(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(Object.values(components).flatMap(g => g.children), true);
+
+            document.body.style.cursor = intersects.length > 0 ? 'pointer' : 'default';
+        }
+
+        function showInfo(id) {
+            const info = componentInfo[id];
+            const panel = document.getElementById('info-panel');
+            document.getElementById('info-title').textContent = info.name;
+            document.getElementById('info-desc').textContent = info.desc;
+            panel.classList.add('visible');
+
+            setTimeout(() => {
+                panel.classList.remove('visible');
+            }, 5000);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>
